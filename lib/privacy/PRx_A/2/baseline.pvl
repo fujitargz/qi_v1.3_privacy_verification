@@ -1,0 +1,50 @@
+let PRx_A2(
+    c: channel,
+    spkCA: spkey,
+    certPTx: certificate,
+    spkPTx: spkey,
+    dummyCert: certificate,
+    PRx_BDID: BasicDeviceIdentifier
+) =
+    (* Ping phase *)
+    in(c, DigitalPing': DigitalPingPacket);
+    out(c, SIG);
+    (* Configuration phase *)
+    out(c, ID(MajorVer, MinorVer, MC, PRx_BDID));
+    out(c, CFG);
+    out(c, CE);
+    out(c, RP8);
+
+    (* Ping phase *)
+    in(c, DigitalPing': DigitalPingPacket);
+    out(c, SIG);
+    (* Configuration phase *)
+    out(c, ID(MajorVer, MinorVer, MC, PRx_BDID));
+    out(c, CFG);
+    out(c, CE);
+    out(c, RP8).
+
+let PTx_forA2(
+    c: channel,
+    IDPTx: PTxID,
+    spkPTx: spkey,
+    sskPTx: sskey,
+    certPTx: certificate
+) =
+    (* Ping phase *)
+    out(c, DigitalPing);
+    in(c, SIG': SIGPacket);
+    (* Configuration phase *)
+    in(c, IDPacket': IDPacket);
+    in(c, CFG': CFGPacket);
+    in(c, CE': CEPacket);
+    in(c, RP8': RPPacket);
+
+    (* Ping phase *)
+    out(c, DigitalPing);
+    in(c, SIG': SIGPacket);
+    (* Configuration phase *)
+    in(c, IDPacket': IDPacket);
+    in(c, CFG': CFGPacket);
+    in(c, CE': CEPacket);
+    in(c, RP8': RPPacket).

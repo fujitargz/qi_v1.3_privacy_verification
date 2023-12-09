@@ -1,0 +1,79 @@
+let PRx_B(
+    c: channel,
+    spkCA: spkey,
+    certPTx: certificate,
+    spkPTx: spkey,
+    dummyCert: certificate,
+    PRx_BDID: BasicDeviceIdentifier
+) =
+    (* Ping phase *)
+    in(c, DigitalPing': DigitalPingPacket);
+    out(c, SIG);
+    (* Configuration phase *)
+    out(c, ID(MajorVer, MinorVer, MC, PRx_BDID));
+    out(c, CFG);
+    in(c, ACK'_CFG: ACKPacket);
+    out(c, FOD);
+    in(c, ACK'_FOD: ACKPacket);
+    out(c, SRQ);
+    in(c, ACK'_SRQ: ACKPacket);
+    out(c, SRQen);
+    in(c, ACK'_SRQen: ACKPacket);
+    out(c, CE);
+    out(c, RP);
+    (* GET_DIGESTS *)
+    out(c, (VERSION, GET_DIGESTS));
+    in(c, (v_dig: version, msg_dig: msgType, digest_dig: bitstring));
+    if v_dig = VERSION then
+    if msg_dig = DIGESTS then
+    (* consider certPTx/spkPTx is cached *)
+    if digest_dig = hash(certPTx) then
+    (* consider certPTx is revoked *)
+    if hash(certPTx) = hash(certPTx) then
+    event revoked(spkPTx) else
+    event notRevoked(spkPTx);
+    (* CHALLENGE *)
+    new nonce: bitstring;
+    out(c, (VERSION, CHALLENGE, nonce));
+    in(c, (v_chalAuth: version, msg_chalAuth: msgType, lsb': bitstring, sig': bitstring));
+    if v_chalAuth = VERSION then
+    if msg_chalAuth = CHALLENGE_AUTH then
+    if checksign((digest_dig, VERSION, CHALLENGE, nonce, v_chalAuth, msg_chalAuth, lsb'), sig', spkPTx) then
+    event successAuth(spkPTx).
+
+let PTx_forB(
+    c: channel,
+    IDPTx: PTxID,
+    spkPTx: spkey,
+    sskPTx: sskey,
+    certPTx: certificate
+) =
+    (* Ping phase *)
+    out(c, DigitalPing);
+    in(c, SIG': SIGPacket);
+    (* Configuration phase *)
+    in(c, IDPacket': IDPacket);
+    in(c, CFG': CFGPacket);
+    out(c, ACK);
+    in(c, FOD': FODPacket);
+    out(c, ACK);
+    in(c, SRQ': SRQPacket);
+    out(c, ACK);
+    in(c, SRQen: SRQenPacket);
+    out(c, ACK);
+    in(c, CE': CEPacket);
+    in(c, RP': RPPacket);
+    (* DIGESTS *)
+    in(c, (v_getDig: version, msg_getDig: msgType));
+    if v_getDig = VERSION then
+    if msg_getDig = GET_DIGESTS then
+    let h = hash(certPTx) in
+    out(c, (VERSION, DIGESTS, h));
+    (* CHALLENGE_AUTH *)
+    in(c, (v_chal: version, msg_chal: msgType, nonce_chal: bitstring));
+    if v_chal = VERSION then
+    if msg_chal = CHALLENGE then
+    let lsb = extLSB(h) in
+    let sig = sign((h, v_chal, msg_chal, nonce_chal, VERSION, CHALLENGE_AUTH, lsb), sskPTx) in
+    event sendResp(sskPTx);
+    out(c, (VERSION, CHALLENGE_AUTH, lsb, sig)).

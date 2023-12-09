@@ -1,0 +1,81 @@
+let PRx_A2(
+    c: channel,
+    spkCA: spkey,
+    certPTx: certificate,
+    spkPTx: spkey,
+    dummyCert: certificate,
+    PRx_BDID: BasicDeviceIdentifier
+) =
+    (* Ping phase *)
+    in(c, DigitalPing': DigitalPingPacket);
+    out(c, SIG);
+    (* Configuration phase *)
+    out(c, ID(MajorVer, MinorVer, MC, PRx_BDID));
+    out(c, CFG);
+    in(c, ACK'_CFG: ACKPacket);
+    out(c, FOD);
+    in(c, ACK'_FOD: ACKPacket);
+    out(c, SRQ);
+    in(c, ACK'_SRQ: ACKPacket);
+    out(c, SRQen);
+    in(c, ACK'_SRQen: ACKPacket);
+    out(c, CE);
+    out(c, RP);
+    (* CHALLENGE *)
+    new nonce: bitstring;
+    out(c, (VERSION, CHALLENGE, nonce));
+    in(c, (v_chalAuth: version, msg_chalAuth: msgType, lsb': bitstring, sig': bitstring));
+    if v_chalAuth = VERSION then
+    if msg_chalAuth = CHALLENGE_AUTH then
+    (* consider dummyCert is cached *)
+    if lsb' <> extLSB(hash(dummyCert)) then
+    (* GET_CERTIFICATE *)
+    out(c, (VERSION, GET_CERTIFICATE));
+    in(c, (v_cert: version, msg_cert: msgType, cert': certificate));
+    if v_cert = VERSION then
+    if msg_cert = CERTIFICATE then
+    if verifyCert(cert', spkCA) then
+    let spk' = extKey(cert') in
+    (* consider certPTx is revoked *)
+    if hash(cert') = hash(certPTx) then
+    event revoked(spk') else
+    event notRevoked(spk');
+    if checksign((hash(cert'), VERSION, CHALLENGE, nonce, v_chalAuth, msg_chalAuth, lsb'), sig', spk') then
+    event successAuth(spk').
+
+let PTx_forA2(
+    c: channel,
+    IDPTx: PTxID,
+    spkPTx: spkey,
+    sskPTx: sskey,
+    certPTx: certificate
+) =
+    (* Ping phase *)
+    out(c, DigitalPing);
+    in(c, SIG': SIGPacket);
+    (* Configuration phase *)
+    in(c, IDPacket': IDPacket);
+    in(c, CFG': CFGPacket);
+    out(c, ACK);
+    in(c, FOD': FODPacket);
+    out(c, ACK);
+    in(c, SRQ': SRQPacket);
+    out(c, ACK);
+    in(c, SRQen: SRQenPacket);
+    out(c, ACK);
+    in(c, CE': CEPacket);
+    in(c, RP': RPPacket);
+    (* CHALLENGE_AUTH *)
+    in(c, (v_chal: version, msg_chal: msgType, nonce_chal: bitstring));
+    if v_chal = VERSION then
+    if msg_chal = CHALLENGE then
+    let h = hash(certPTx) in
+    let lsb = extLSB(h) in
+    let sig = sign((h, v_chal, msg_chal, nonce_chal, VERSION, CHALLENGE_AUTH, lsb), sskPTx) in
+    event sendResp(sskPTx);
+    out(c, (VERSION, CHALLENGE_AUTH, lsb, sig));
+    (* CERTIFICATE *)
+    in(c, (v_getCert: version, msg_getCert: msgType));
+    if v_getCert = VERSION then
+    if msg_getCert = GET_CERTIFICATE then
+    out(c, (VERSION, CERTIFICATE, IDPTx, spkPTx, certPTx)).

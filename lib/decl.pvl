@@ -1,0 +1,119 @@
+(* 
+ * *****************************
+ * Qi Baseline/Extended Protocol
+ * *****************************
+ *)
+
+type DigitalPingPacket.
+free DigitalPing: DigitalPingPacket.
+
+type SIGPacket.
+free SIG: SIGPacket.
+
+type IDPacket.
+type MajorVersion.
+type MinorVersion.
+type ManufacturerCode.
+type BasicDeviceIdentifier.
+fun ID(
+    MajorVersion,
+    MinorVersion,
+    ManufacturerCode,
+    BasicDeviceIdentifier
+): IDPacket [data].
+free MajorVer: MajorVersion.
+free MinorVer: MinorVersion.
+free MC: ManufacturerCode.
+free BDID, BDID_A, BDID_B: BasicDeviceIdentifier.
+
+type CFGPacket.
+free CFG: CFGPacket.
+
+type ACKPacket.
+free ACK: ACKPacket.
+
+type FODPacket.
+free FOD: FODPacket.
+
+type SRQPacket.
+free SRQ: SRQPacket.
+
+type SRQenPacket.
+free SRQen: SRQenPacket.
+
+type CEPacket.
+free CE: CEPacket.
+
+type RPPacket.
+free RP: RPPacket.
+
+type RP8Packet.
+free RP8: RP8Packet.
+
+type ATNPacket.
+free ATN: ATNPacket.
+
+type DSRPacket.
+free DSR: DSRPacket.
+
+type CAPPacket.
+free CAP: CAPPacket.
+
+type NEGOPacket.
+free NEGO: NEGOPacket.
+
+(* 
+ * *****************
+ * Qi Authentication
+ * *****************
+ *)
+
+ (* Digital Signature *)
+type sskey.
+type spkey.
+fun spk(sskey): spkey.
+fun sign(bitstring, sskey): bitstring.
+reduc forall m: bitstring, k: sskey;
+    checksign(m, sign(m, k), spk(k)) = true.
+
+(* PTx's properties *)
+type PTxID.
+free IDPTx: PTxID.
+free sskPTx: sskey [private].
+
+(* Certificate *)
+type certificate.
+fun cert(PTxID, spkey, bitstring): certificate [data].
+reduc forall id: PTxID, k: spkey, sig: bitstring;
+    extKey(cert(id, k, sig)) = k.
+reduc forall id: PTxID, k: spkey, CAKey: sskey, sig: bitstring;
+    verifyCert(cert(id, k, sign((id, k), CAKey)), spk(CAKey)) = true.
+
+(* Hash function *)
+fun hash(certificate): bitstring.
+
+(* Extract a least significant byte (LSB) *)
+fun extLSB(bitstring): bitstring.
+
+(* Protocol version *)
+type version.
+const VERSION: version.
+
+(* Message type *)
+type msgType.
+const
+    GET_DIGESTS,
+    GET_CERTIFICATE,
+    CHALLENGE,
+    DIGESTS,
+    CERTIFICATE,
+    CHALLENGE_AUTH
+: msgType.
+
+(* Events *)
+event sendID(BasicDeviceIdentifier). (* PTx sends an ID packet to PRx *)
+event recieveID(BasicDeviceIdentifier). (* PRx recieves an ID packet *)
+event successAuth(spkey). (* PRx accepts PTx who has spkey. *)
+event sendResp(sskey). (* PTx who has sskey send CHALLENGE_AUTH response to PRx. *)
+event revoked(spkey). (* PTx's certificate is revoked. *)
+event notRevoked(spkey). (* PTx's certificate is not revoked. *)

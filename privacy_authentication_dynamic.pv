@@ -1,0 +1,48 @@
+free c: channel.
+
+type flag.
+const flag_A, flag_B: flag.
+
+let second(
+    f: flag,
+    c: channel,
+    spkCA: spkey,
+    certPTx: certificate,
+    spkPTx: spkey,
+    dummyCert: certificate,
+    PRx_BDID: BasicDeviceIdentifier,
+    IDPTx: PTxID,
+    sskPTx: sskey
+) = 
+    if (f = flag_A) then
+    (
+        PRx_A2(c, spkCA, certPTx, spkPTx, dummyCert, PRx_BDID) | PTx_forA2(c, IDPTx, spkPTx, sskPTx, certPTx)
+    )
+    else if (f = flag_B) then
+    (
+        PRx_B(c, spkCA, certPTx, spkPTx, dummyCert, PRx_BDID) | PTx_forB(c, IDPTx, spkPTx, sskPTx, certPTx)
+    ).
+
+process
+    (* setup *)
+    new sskCA: sskey;
+    let spkCA = spk(sskCA) in out(c, spkCA);
+    let spkPTx = spk(sskPTx) in out(c, spkPTx);
+    let productUnitCert = cert(IDPTx, spkPTx, sign((IDPTx, spkPTx), sskCA)) in
+    new dummyIDPTx: PTxID;
+    new dummySskPTx: sskey;
+    let dummySpkPTx = spk(dummySskPTx) in out (c, dummySpkPTx);
+    let dummyProductUnitCert = cert(dummyIDPTx, dummySpkPTx, sign((dummyIDPTx, dummySpkPTx), sskCA)) in
+    (
+        (
+            new BDID_A1: BasicDeviceIdentifier;
+            PRx_A1(c, spkCA, productUnitCert, spkPTx, dummyProductUnitCert, BDID_A1) | PTx_forA1(c, IDPTx, spkPTx, sskPTx, productUnitCert)
+        )
+        |
+        (
+            phase 1;
+            new BDID_A2: BasicDeviceIdentifier;
+            new BDID_B1: BasicDeviceIdentifier;
+            second(choice[flag_A, flag_B], c, spkCA, productUnitCert, spkPTx, dummyProductUnitCert, choice[BDID_A2, BDID_B1], IDPTx, sskPTx)
+        )
+    )
